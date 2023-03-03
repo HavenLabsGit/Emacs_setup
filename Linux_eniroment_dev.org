@@ -1,0 +1,189 @@
+#+title: Esp Development
+* Purpose
++ To install a dedicated development environment for ESP development
+
+  Issues I found while using my daily driver is sometimes I could get the environment to work while other days things just seemed broken. Packages needs to stay at certain versions and if I needed to use some IDEs, like microchip; distros needed to stay at certain versions as well.
+
+  I have became a believer in immutable linux desktops and use distrobox for my enviroments. It really has changed the game!
+
+* Installing VM - Debian Bullseye/Bookworm
+I am familiar with Debian so I am sticking to it! + 4096 MB can balloon to 6656 MB
+** Bullseye
+Bullseye will be for PIC development since their IDE broke in bullseye due to updates related to Java version 27 for EMACs
+** Bookworm
+Bookworm has the packages necessary for native compilation in EMACs which will greatly speed things up, version 28 for EMACs
+* EMACs Install
+** Emacs 27
+*** Download
+Navigate to the GNU mirror download Emacs 27.2
+*** Installed these packages after fresh install
+
+  #+begin_src bash
+sudo apt install gcc libgccjit0 libgccjit-10-dev libjansson4 libjansson-dev autoconf make xaw3dg-dev libwxgtk3.0-gtk3-dev libjpeg-dev libgif-dev giflib-tools libtiff-dev libgnutls28-dev libncurses-dev git libpng-dev clang clangd
+# tell which complier to use
+export CC="gcc-10"
+# go to emacs download
+cd Downloads/emacs-27.2
+# start installing
+./autogen.sh
+./configure --without-compress-install --with-json
+make
+sudo make install
+** Emacs 28
+I am choosing to use EMACS as the window manager and IDE for ESP development. It is recommend to install with native compilation and JSON compilation as well to speed things up.
+** Download
++ first install git
++ Clone EMACS
++ Install dependencies
+
+  #+begin_src bash
+sudo apt install gcc libgccjit0 libgccjit-12-dev libjansson4 libjansson-dev autoconf make xaw3dg-dev libwxgtk3.2-dev libjpeg-dev libgif-dev giflib-tools libtiff-dev libgnutls28-dev libncurses-dev pkg-config libpng-dev clang clangd git libgtk-3-dev
+# tell which complier to use
+export CC="gcc-12"
+# go to emacs download
+cd Downloads/emacs-28.1
+./autogen.sh
+./configure --without-compress-install --with-native-compilation --with-json --with-mailutils --with-x-toolkit=gtk --prefix=$HOME/.applications/emacs
+
+#+end_src
+** Doom install
+#+begin_src
+#prerequisites
+sudo apt install fd-find ripgrep
+git clone --depth 1 https://github.com/doomemacs/doomemacs ~/.emacs.d
+~/.emacs.d/bin/doom install
+#+end_src
+*** Doom utilities
+Add the bin to your PATH, I put mine in .profile
+#+begin_src bash
+export PATH="$PATH:~/.emacs.d/bin"
+# save then reload
+source .profile
+#+end_src
+*** LSP Setup
+** pyright
+pyright is used as our python checker
+sudo apt install pip
+pip install pyright
+** languagetools
+This is used for spell checking. Download the zip from here https://internal1.languagetool.org/snapshots/
+Extract to a location and point emacs to it.
+Also you will need java to run it,
+sudo apt install openjdk-17-jdk
+** Issues I encountered
+#+begin_src lisp
+Error (doom-first-file-hook): Error running hook "global-git-commit-mode" because: (void-variable transient-base-map)
+#+end_src
+
+I received this error to which I found the answer online. Place this in your package.el file.
+
+It seems that some magit dependencies break with Emacs 28, as the function defvar-keymap is only added in Emacs 29. The solution is to pin an older version of the packages, as Doom currently does not support Emacs 29. You can do this with the following code:
+#+begin_src lisp
+(package! transient
+      :pin "c2bdf7e12c530eb85476d3aef317eb2941ab9440"
+      :recipe (:host github :repo "magit/transient"))
+
+(package! with-editor
+          :pin "bbc60f68ac190f02da8a100b6fb67cf1c27c53ab"
+          :recipe (:host github :repo "magit/with-editor"))
+#+end_src
+* Bear install
+For code completion with LSP, the language server like clangd needs a complie_commands.json file to know where all the headers and such are. We can create such a file for pic development by using bear.
+#+begin_src bash
+sudo apt install bear
+#+end_src
+**  Bear Configure PIC
+You need to point bear to the compiler and include any flags. Some flags included with PICs will still show up as errors with clang. Only way I know how to fix is remove the flags which doesn't seem to affect auto complete. I placed my config file in ~/.config, just remember where you placed it; you will need to call the location later.
+
+In my example below I am using xc8 v2.40, verify the compiler you are using. If clang compains about any arguemnts once in Emacs, just add them to flags_to_remove.
+
+#+begin_src json
+{
+  "compilation": {
+    "compilers_to_recognize": [
+      {
+        "executable": "/opt/microchip/xc8/v2.40/bin/xc8-cc",
+        "flags_to_add": ["-I/opt/microchip/xc8/v2.40/pic/include/c99", "-I/opt/microchip/xc8/v2.40/pic/include/proc", "-I/opt/microchip/xc8/v2.40/pic/include"],
+        "flags_to_remove":["-fno-short-double","-fno-short-float","-maddrqual=ignore","-mwarn=-3","-msummary=-psect,-class,+mem,-hex,-file","-ginhx32","-mno-keep-startup","-mno-osccal","-mno-resetbits","-mno-save-resetbits","-mno-download","-mno-stackcall","-mdefault-config-bits","-mstack=compiled:auto:auto","-fasmfile"]
+      }
+    ],
+    "compilers_to_exclude": []
+  },
+  "output": {
+    "content": {
+      "include_only_existing_source": true,
+      "paths_to_include": [],
+      "paths_to_exclude": []
+    },
+    "format": {
+      "command_as_array": true,
+      "drop_output_field": false
+    }
+  }
+}
+#+end_src
+* PIC Build and Makefile
+** Setup
+First you must add the script to build projects to your PATH. Make note of what version IDE you are using. Since this is a PIC development environment add the PATH to .bashrc or what ever shell you are using.
+#+begin_src bash
+# what shell am I using?
+echo $0
+#+end_src
+
+#+RESULTS:
+: bash
+
+#+begin_src bash
+nano source .bashrc
+# at bottom paste below. NOTE: You want $PATH: at front to add variable, :$PATH will override your other PATH variables for basic linux commands
+# also make note of version IDE
+export PATH=$PATH:/opt/microchip/mplabx/v6.05/mplab_platform/bin/
+# save file and reload .bashrc
+source .bashrc
+#+end_src
+** Building
+Once you have set the path, we can now execute the prjMakefilesGenerator.sh which needs to point to the directory which holds the project.
+
+Example:
+#+begin_src bash
+prjMakefilesGenerator.sh -v ~/Nextcloud/Programming/OLED.X/
+#+end_src
+** Makefile
+Once project is built, we can now run the make file through bear to create our  compile_commands.json
+
+***  Run Bear
+You will need to point to the configuration file. Navigate to the folder with your make file and run the bear command below. Wouldn't hurt to do a make clean to start fresh.
+#+begin_src bash
+bear --config ~/.config/bear.conf -- make -f nbproject/Makefile-default.mk SUBPROJECTS= .build-conf
+#+end_src
+* Programming through CLI
+To keep with theme of staying out of MPLABs IDE, we will now program through the CLI. First we need to add the java file to our path as same fashion with the prjMakefilesGenerator.sh.
+#+begin_src bash
+export PATH=$PATH:/opt/microchip/mplabx/v6.00/mplab_platform/mplab_ipe/ipecmd.jar
+#+end_src
+* ESP Environment
+Set up distrobox
+#+begin_src bash
+distrobox create --image debian:stable --name esp_dev
+distrobox enter
+sudo apt-get install git wget flex bison gperf python3 python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+#download sdk
+mkdir -p ~/esp
+cd ~/esp
+git clone --recursive https://github.com/espressif/esp-idf.gikt
+#setup tools
+cd ~/esp/esp-idf
+./install.sh esp32
+# to setup enviroment variables
+. $HOME/esp/esp-idf/export.sh
+# Add an alias to execute script in .profile, .bash_profile, etc.
+alias get_idf='. $HOME/esp/esp-idf/export.sh'
+#+end_src
+** Code Completion
+Download the llvm which has xtesna support
+https://github.com/espressif/llvm-project/releases
+extract to your chosen location
+
+Alternatively since I have not gotten above to work, pass cmake flag with idf.py since it is just a wrapper around cmake.
+
+CMAKE_EXPORT_COMPILE_COMMANDS=1
