@@ -29,6 +29,8 @@ cd Downloads/emacs-27.2
 ./configure --without-compress-install --with-json
 make
 sudo make install
+#+end_src
+
 ** Emacs 28
 I am choosing to use EMACS as the window manager and IDE for ESP development. It is recommend to install with native compilation and JSON compilation as well to speed things up.
 ** Download
@@ -46,6 +48,7 @@ cd Downloads/emacs-28.1
 ./configure --without-compress-install --with-native-compilation --with-json --with-mailutils --with-x-toolkit=gtk --prefix=$HOME/.applications/emacs
 
 #+end_src
+
 ** Doom install
 #+begin_src
 #prerequisites
